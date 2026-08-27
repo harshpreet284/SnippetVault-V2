@@ -9,6 +9,7 @@ dotenv.config();
 import connectDB from './config/db.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
+import solutionsRouter from './routes/solutions.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,8 +35,9 @@ app.use(cookieParser());
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/solutions', solutionsRouter);
 // Future route mounts go here as phases are completed:
-// app.use('/api/solutions', solutionsRouter);  // Phase 4-6
+// app.use('/api/search', searchRouter);  // Phase 6 (already wired inside solutions router)
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
