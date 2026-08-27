@@ -2,16 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Load environment variables from server/.env
+// Load environment variables first — before any other imports that need them
 dotenv.config();
 
+import connectDB from './config/db.js';
 import healthRouter from './routes/health.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-// credentials: true is required later for httpOnly cookie-based JWT auth.
+// credentials: true is required for httpOnly cookie-based JWT auth (Phase 3).
 // The origin must be a specific URL (not '*') when credentials are enabled.
 app.use(
   cors({
@@ -25,6 +26,9 @@ app.use(express.json());
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/health', healthRouter);
+// Future route mounts go here as phases are completed:
+// app.use('/api/auth',      authRouter);       // Phase 3
+// app.use('/api/solutions', solutionsRouter);  // Phase 4-6
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -42,7 +46,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`SnippetVault server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
-});
+// ─── Startup ──────────────────────────────────────────────────────────────────
+// Connect to MongoDB first. connectDB() calls process.exit(1) on failure,
+// so app.listen() is only reached after a confirmed DB connection.
+const start = async () => {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(
+      `[Server] SnippetVault running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`
+    );
+  });
+};
+
+start();
