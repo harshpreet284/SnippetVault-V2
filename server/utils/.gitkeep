@@ -1,0 +1,3 @@
+# utils/
+# Shared backend utilities go here.
+# Example: AppError.js (custom error class), validateObjectId.js

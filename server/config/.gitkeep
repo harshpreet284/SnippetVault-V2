@@ -1,0 +1,3 @@
+# config/
+# Phase 2: MongoDB Atlas connection config goes here.
+# Example: db.js
