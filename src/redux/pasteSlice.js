@@ -83,6 +83,24 @@ export const searchSolutionsThunk = createAsyncThunk(
   }
 );
 
+/**
+ * Semantic search via backend Gemini embedding + Atlas Vector Search.
+ * Falls back to keyword results server-side; client always receives 200.
+ *
+ * @param {string} q — natural-language query string
+ */
+export const semanticSearchThunk = createAsyncThunk(
+  'paste/semanticSearch',
+  async (q, { rejectWithValue }) => {
+    try {
+      const data = await solutionsApi.semanticSearchSolutions(q);
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Slice ────────────────────────────────────────────────────────────────────
 
 const pasteSlice = createSlice({
@@ -91,10 +109,11 @@ const pasteSlice = createSlice({
     pastes: [],         // all solution documents from the backend (full list)
     loading: false,
     error: null,
-    // ── Search state (Phase 6) ──────────────────────────────────────
-    searchResults: [],  // results from the last backend search
+    // ── Search state (Phase 6 + 7) ───────────────────────────────
+    searchResults: [],     // results from the last backend search (keyword or semantic)
     isSearchActive: false, // true when any search/filter is in effect
     searchLoading: false,  // separate loading flag so the full list stays visible
+    searchMode: 'keyword', // 'keyword' | 'semantic' — determines UI + heading
   },
   reducers: {
     /**
@@ -106,12 +125,25 @@ const pasteSlice = createSlice({
       state.searchResults = [];
       state.isSearchActive = false;
       state.searchLoading = false;
+      state.searchMode = 'keyword';
     },
     /**
      * Synchronously reset all search/filter state and return to the full list.
-     * Dispatched by the Clear button in Paste.jsx.
+     * Dispatched by the Clear button in Paste.jsx and on mode switch.
      */
     clearSearch: (state) => {
+      state.searchResults = [];
+      state.isSearchActive = false;
+      state.searchLoading = false;
+      state.searchMode = 'keyword';
+    },
+    /**
+     * Switch between keyword and semantic search modes.
+     * Clears current results so stale data from the previous mode is not shown.
+     * Dispatched by the mode toggle in Paste.jsx.
+     */
+    setSearchMode: (state, action) => {
+      state.searchMode = action.payload; // 'keyword' | 'semantic'
       state.searchResults = [];
       state.isSearchActive = false;
       state.searchLoading = false;
@@ -165,17 +197,19 @@ const pasteSlice = createSlice({
         toast.error(action.payload || 'Failed to update paste.');
       });
 
-    // ── deletePasteThunk ────────────────────────────────────────────────────
+    // ── deletePasteThunk ──────────────────────────────────────────────────────────────
     builder
       .addCase(deletePasteThunk.fulfilled, (state, action) => {
         state.pastes = state.pastes.filter((p) => p._id !== action.payload);
+        // Also remove from searchResults so deleted item disappears from search view
+        state.searchResults = state.searchResults.filter((p) => p._id !== action.payload);
         toast.success('Paste deleted!');
       })
       .addCase(deletePasteThunk.rejected, (state, action) => {
         toast.error(action.payload || 'Failed to delete paste.');
       });
 
-    // ── searchSolutionsThunk ────────────────────────────────────────────────
+    // ── searchSolutionsThunk ────────────────────────────────────────────────────────────
     builder
       .addCase(searchSolutionsThunk.pending, (state) => {
         state.searchLoading = true;
@@ -184,15 +218,32 @@ const pasteSlice = createSlice({
         state.searchLoading = false;
         state.searchResults = action.payload;
         state.isSearchActive = true;
+        state.searchMode = 'keyword';
       })
       .addCase(searchSolutionsThunk.rejected, (state, action) => {
         state.searchLoading = false;
         toast.error(action.payload || 'Search failed.');
       });
+
+    // ── semanticSearchThunk ────────────────────────────────────────────────────────────
+    builder
+      .addCase(semanticSearchThunk.pending, (state) => {
+        state.searchLoading = true;
+      })
+      .addCase(semanticSearchThunk.fulfilled, (state, action) => {
+        state.searchLoading = false;
+        state.searchResults = action.payload;
+        state.isSearchActive = true;
+        // searchMode was already set to 'semantic' by setSearchMode before dispatch
+      })
+      .addCase(semanticSearchThunk.rejected, (state, action) => {
+        state.searchLoading = false;
+        toast.error(action.payload || 'Semantic search failed.');
+      });
   },
 });
 
-export const { resetPaste, clearSearch } = pasteSlice.actions;
+export const { resetPaste, clearSearch, setSearchMode } = pasteSlice.actions;
 
 // Keep legacy action name exports so existing component imports don't break
 // during migration — they now dispatch thunks instead of sync actions.

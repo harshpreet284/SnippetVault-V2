@@ -2,7 +2,7 @@ import { Calendar, Copy, Eye, PencilLine, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSelector, useDispatch } from 'react-redux';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { deletePasteThunk, fetchSolutions, searchSolutionsThunk, clearSearch } from '../redux/pasteSlice';
+import { deletePasteThunk, fetchSolutions, searchSolutionsThunk, clearSearch, semanticSearchThunk, setSearchMode } from '../redux/pasteSlice';
 import { FormatDate } from '../utlis/formatDate';
 
 const Paste = () => {
@@ -11,6 +11,7 @@ const Paste = () => {
   const searchResults = useSelector((state) => state.paste.searchResults);
   const isSearchActive  = useSelector((state) => state.paste.isSearchActive);
   const searchLoading = useSelector((state) => state.paste.searchLoading);
+  const searchMode    = useSelector((state) => state.paste.searchMode);
   const dispatch = useDispatch();
 
   // ── Filter state ───────────────────────────────────────────────────────────
@@ -19,9 +20,10 @@ const Paste = () => {
   const [language,    setLanguage]    = useState('');
   const [project,     setProject]     = useState('');
   const [tag,         setTag]         = useState('');
+  const [semanticQuery, setSemanticQuery] = useState('');
 
   // Track whether any filter/search is non-empty
-  const hasFilters = searchTerm.trim() || technology.trim() || language.trim() || project.trim() || tag.trim();
+  const hasFilters = searchTerm.trim() || technology.trim() || language.trim() || project.trim() || tag.trim() || semanticQuery.trim();
 
   // ── Debounce ref (for keyword search field only) ───────────────────────────
   const debounceRef = useRef(null);
@@ -85,8 +87,32 @@ const Paste = () => {
     setLanguage('');
     setProject('');
     setTag('');
+    setSemanticQuery('');
     if (debounceRef.current) clearTimeout(debounceRef.current);
     dispatch(clearSearch());
+  };
+
+  // ── Mode Toggle ────────────────────────────────────────────────────────────
+  const handleModeSwitch = (mode) => {
+    if (mode === searchMode) return;
+    dispatch(setSearchMode(mode));
+    setSearchTerm('');
+    setTechnology('');
+    setLanguage('');
+    setProject('');
+    setTag('');
+    setSemanticQuery('');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  };
+
+  // ── Semantic Search Submit ─────────────────────────────────────────────────
+  const handleSemanticSearch = (e) => {
+    e.preventDefault();
+    if (semanticQuery.trim()) {
+      dispatch(semanticSearchThunk(semanticQuery));
+    } else {
+      dispatch(clearSearch());
+    }
   };
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -105,70 +131,115 @@ const Paste = () => {
     <div className="w-full h-full py-10 max-w-[1200px] mx-auto px-5 lg:px-0">
       <div className="flex flex-col gap-y-3">
 
-        {/* ── Search + Filter area ── */}
-        <div className="flex flex-col gap-y-2 mt-6">
-          {/* Keyword row */}
-          <div className="w-full flex gap-3 px-4 py-2 rounded-[0.3rem] border border-[rgba(128,121,121,0.3)]">
-            <input
-              type="search"
-              id="paste-search"
-              placeholder="Search pastes..."
-              className={inputCls}
-              value={searchTerm}
-              onChange={handleKeywordChange}
-            />
-            {hasFilters && (
-              <button
-                onClick={handleClear}
-                className="text-xs text-gray-400 hover:text-red-500 whitespace-nowrap transition-colors duration-150"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
+        {/* ── Mode Toggle ── */}
+        <div className="flex gap-4 mt-6">
+          <button
+            onClick={() => handleModeSwitch('keyword')}
+            className={`px-4 py-2 rounded-[0.3rem] border transition-colors ${searchMode === 'keyword' ? 'bg-gray-200 border-gray-400 font-semibold text-black' : 'bg-white border-[rgba(128,121,121,0.3)] text-gray-600 hover:bg-gray-50'}`}
+          >
+            🔍 Keyword
+          </button>
+          <button
+            onClick={() => handleModeSwitch('semantic')}
+            className={`px-4 py-2 rounded-[0.3rem] border transition-colors ${searchMode === 'semantic' ? 'bg-gray-200 border-gray-400 font-semibold text-black' : 'bg-white border-[rgba(128,121,121,0.3)] text-gray-600 hover:bg-gray-50'}`}
+          >
+            ✨ Semantic
+          </button>
+        </div>
 
-          {/* Filter row */}
-          <div className="w-full flex flex-wrap gap-2 px-4 py-2 rounded-[0.3rem] border border-[rgba(128,121,121,0.3)]">
-            <input
-              type="text"
-              id="filter-technology"
-              placeholder="Technology (e.g. React)"
-              className={inputCls}
-              value={technology}
-              onChange={handleFilterChange(setTechnology, 'technology')}
-            />
-            <input
-              type="text"
-              id="filter-language"
-              placeholder="Language (e.g. JavaScript)"
-              className={inputCls}
-              value={language}
-              onChange={handleFilterChange(setLanguage, 'language')}
-            />
-            <input
-              type="text"
-              id="filter-project"
-              placeholder="Project"
-              className={inputCls}
-              value={project}
-              onChange={handleFilterChange(setProject, 'project')}
-            />
-            <input
-              type="text"
-              id="filter-tag"
-              placeholder="Tag"
-              className={inputCls}
-              value={tag}
-              onChange={handleFilterChange(setTag, 'tag')}
-            />
-          </div>
+        {/* ── Search + Filter area ── */}
+        <div className="flex flex-col gap-y-2 mt-2">
+          {searchMode === 'keyword' ? (
+            <>
+              {/* Keyword row */}
+              <div className="w-full flex gap-3 px-4 py-2 rounded-[0.3rem] border border-[rgba(128,121,121,0.3)]">
+                <input
+                  type="search"
+                  id="paste-search"
+                  placeholder="Search pastes..."
+                  className={inputCls}
+                  value={searchTerm}
+                  onChange={handleKeywordChange}
+                />
+                {hasFilters && (
+                  <button
+                    onClick={handleClear}
+                    className="text-xs text-gray-400 hover:text-red-500 whitespace-nowrap transition-colors duration-150"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+
+              {/* Filter row */}
+              <div className="w-full flex flex-wrap gap-2 px-4 py-2 rounded-[0.3rem] border border-[rgba(128,121,121,0.3)]">
+                <input
+                  type="text"
+                  id="filter-technology"
+                  placeholder="Technology (e.g. React)"
+                  className={inputCls}
+                  value={technology}
+                  onChange={handleFilterChange(setTechnology, 'technology')}
+                />
+                <input
+                  type="text"
+                  id="filter-language"
+                  placeholder="Language (e.g. JavaScript)"
+                  className={inputCls}
+                  value={language}
+                  onChange={handleFilterChange(setLanguage, 'language')}
+                />
+                <input
+                  type="text"
+                  id="filter-project"
+                  placeholder="Project"
+                  className={inputCls}
+                  value={project}
+                  onChange={handleFilterChange(setProject, 'project')}
+                />
+                <input
+                  type="text"
+                  id="filter-tag"
+                  placeholder="Tag"
+                  className={inputCls}
+                  value={tag}
+                  onChange={handleFilterChange(setTag, 'tag')}
+                />
+              </div>
+            </>
+          ) : (
+            <form onSubmit={handleSemanticSearch} className="w-full flex gap-3 px-4 py-2 rounded-[0.3rem] border border-[rgba(128,121,121,0.3)]">
+              <input
+                type="search"
+                placeholder="Describe what you're looking for... (e.g. 'how to parse a JWT')"
+                className={inputCls}
+                value={semanticQuery}
+                onChange={(e) => setSemanticQuery(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="text-sm font-semibold text-gray-600 hover:text-black transition-colors"
+              >
+                Search
+              </button>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="text-xs text-gray-400 hover:text-red-500 whitespace-nowrap transition-colors duration-150"
+                >
+                  Clear search
+                </button>
+              )}
+            </form>
+          )}
         </div>
 
         {/* ── Results section ── */}
         <div className="flex flex-col border border-[rgba(128,121,121,0.3)] py-4 rounded-[0.4rem]">
           <h2 className="px-4 text-4xl font-bold border-b border-[rgba(128,121,121,0.3)] pb-4">
             {isSearchActive
-              ? `Search Results (${displayed.length})`
+              ? (searchMode === 'semantic' ? `Semantic Results (${displayed.length})` : `Search Results (${displayed.length})`)
               : 'All Pastes'}
           </h2>
 

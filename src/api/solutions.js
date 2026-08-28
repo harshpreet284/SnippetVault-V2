@@ -37,3 +37,17 @@ export const searchSolutions = (params = {}) => {
   if (params.tag        && params.tag.trim())        qs.set('tag',         params.tag.trim());
   return get(`/solutions/search?${qs.toString()}`);
 };
+
+/**
+ * GET /api/solutions/search?mode=semantic&q=<query>
+ *
+ * Semantic search — backend generates a Gemini embedding for the query and
+ * runs MongoDB Atlas Vector Search against the authenticated user's solutions.
+ * Falls back to keyword search on the same endpoint if Gemini or Atlas is
+ * unavailable (handled server-side; client receives 200 in all cases).
+ *
+ * @param {string} q — natural-language query
+ */
+export const semanticSearchSolutions = (q) =>
+  get(`/solutions/search?mode=semantic&q=${encodeURIComponent(q.trim())}`);
+
