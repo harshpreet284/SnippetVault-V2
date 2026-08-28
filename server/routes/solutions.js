@@ -6,6 +6,7 @@ import {
   createSolution,
   updateSolution,
   deleteSolution,
+  keywordSearch,
 } from '../controllers/solutionsController.js';
 
 const router = Router();
@@ -18,9 +19,9 @@ router.use(protect);
 router.get('/', listSolutions);
 router.post('/', createSolution);
 
-// ── Phase 6 search routes go HERE — before /:id — to prevent 'search' and
-// 'semantic-search' from being caught as an :id parameter.
-// router.get('/search', keywordSearch);          // Phase 6
+// ── Phase 6: keyword search — registered BEFORE /:id so Express does not
+// mistake the literal string "search" for a MongoDB ObjectId parameter.
+router.get('/search', keywordSearch);
 // router.post('/semantic-search', semanticSearch); // Phase 7
 
 // ── Document routes ────────────────────────────────────────────────────────────

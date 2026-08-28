@@ -66,22 +66,55 @@ export const deletePasteThunk = createAsyncThunk(
   }
 );
 
+/**
+ * Keyword/filter search via the backend search endpoint.
+ *
+ * @param {{ q?: string, technology?: string, language?: string, project?: string, tag?: string }} params
+ */
+export const searchSolutionsThunk = createAsyncThunk(
+  'paste/search',
+  async (params, { rejectWithValue }) => {
+    try {
+      const data = await solutionsApi.searchSolutions(params);
+      return data.data; // array of matching solution documents
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
 // ─── Slice ────────────────────────────────────────────────────────────────────
 
 const pasteSlice = createSlice({
   name: 'paste',
   initialState: {
-    pastes: [],       // solution documents from the backend
+    pastes: [],         // all solution documents from the backend (full list)
     loading: false,
     error: null,
+    // ── Search state (Phase 6) ──────────────────────────────────────
+    searchResults: [],  // results from the last backend search
+    isSearchActive: false, // true when any search/filter is in effect
+    searchLoading: false,  // separate loading flag so the full list stays visible
   },
   reducers: {
     /**
      * Clear all pastes from Redux state (called on logout).
-     * No longer writes to localStorage.
+     * Also clears search state so stale results don't persist across sessions.
      */
     resetPaste: (state) => {
       state.pastes = [];
+      state.searchResults = [];
+      state.isSearchActive = false;
+      state.searchLoading = false;
+    },
+    /**
+     * Synchronously reset all search/filter state and return to the full list.
+     * Dispatched by the Clear button in Paste.jsx.
+     */
+    clearSearch: (state) => {
+      state.searchResults = [];
+      state.isSearchActive = false;
+      state.searchLoading = false;
     },
   },
   extraReducers: (builder) => {
@@ -141,10 +174,25 @@ const pasteSlice = createSlice({
       .addCase(deletePasteThunk.rejected, (state, action) => {
         toast.error(action.payload || 'Failed to delete paste.');
       });
+
+    // ── searchSolutionsThunk ────────────────────────────────────────────────
+    builder
+      .addCase(searchSolutionsThunk.pending, (state) => {
+        state.searchLoading = true;
+      })
+      .addCase(searchSolutionsThunk.fulfilled, (state, action) => {
+        state.searchLoading = false;
+        state.searchResults = action.payload;
+        state.isSearchActive = true;
+      })
+      .addCase(searchSolutionsThunk.rejected, (state, action) => {
+        state.searchLoading = false;
+        toast.error(action.payload || 'Search failed.');
+      });
   },
 });
 
-export const { resetPaste } = pasteSlice.actions;
+export const { resetPaste, clearSearch } = pasteSlice.actions;
 
 // Keep legacy action name exports so existing component imports don't break
 // during migration — they now dispatch thunks instead of sync actions.

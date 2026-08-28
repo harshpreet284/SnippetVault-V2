@@ -47,6 +47,14 @@ const pickWritableFields = (body) => {
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 /**
+ * Escapes special regex metacharacters in a user-supplied string.
+ * Prevents regex injection when building case-insensitive MongoDB queries.
+ *
+ * Example: 'a.b*c' → 'a\.b\*c'
+ */
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
  * Validates the tags field when present in req.body.
  * Returns an error message string if invalid, or null if valid.
  */
@@ -73,12 +81,95 @@ const validateUrl = (url) => {
  *
  * Returns all solutions belonging to the authenticated user, newest first.
  * Embedding is excluded from results (select: false in schema).
- *
- * Filtering / keyword search will be added in Phase 6.
  */
 export const listSolutions = async (req, res, next) => {
   try {
     const solutions = await Solution.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, data: solutions });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/solutions/search
+ *
+ * Keyword search and filter across the authenticated user's solutions.
+ * All results are scoped to req.user.id — users cannot search each other's data.
+ *
+ * Query parameters (all optional, all combined with AND logic):
+ *   q          — free-text keyword; matched case-insensitively against title,
+ *                problem, solution, technology, language, project, and notes.
+ *   technology — exact (case-insensitive) match on the technology field.
+ *   language   — exact (case-insensitive) match on the language field.
+ *   project    — exact (case-insensitive) match on the project field.
+ *   tag        — a single tag value that must appear in the tags array
+ *                (case-insensitive element match).
+ *
+ * Returns the same shape as listSolutions: { success: true, data: [...] }
+ * Returns an empty array (not 404) when no results match — that is a valid
+ * search outcome, not an error.
+ *
+ * Route must be registered BEFORE /:id so Express does not treat the literal
+ * string "search" as a MongoDB ObjectId parameter.
+ */
+export const keywordSearch = async (req, res, next) => {
+  try {
+    const { q, technology, language, project, tag } = req.query;
+
+    // ── Parameter length guard ────────────────────────────────────────────────
+    // Prevents excessively large regex patterns from reaching MongoDB.
+    const MAX_PARAM_LENGTH = 200;
+    for (const [key, val] of Object.entries({ q, technology, language, project, tag })) {
+      if (val && val.length > MAX_PARAM_LENGTH) {
+        return res.status(400).json({
+          success: false,
+          message: `Query parameter "${key}" exceeds the maximum allowed length of ${MAX_PARAM_LENGTH} characters.`,
+        });
+      }
+    }
+
+    // ── Build the MongoDB filter ──────────────────────────────────────────────
+    // Always scope to the authenticated user's data.
+    const filter = { userId: req.user.id };
+
+    // Free-text keyword: partial, case-insensitive match across 7 searchable fields.
+    if (q && q.trim()) {
+      const re = new RegExp(escapeRegex(q.trim()), 'i');
+      filter.$or = [
+        { title: re },
+        { problem: re },
+        { solution: re },
+        { technology: re },
+        { language: re },
+        { project: re },
+        { notes: re },
+      ];
+    }
+
+    // Exact (case-insensitive) match on discrete filter fields.
+    // Using anchored regex (^ … $) so "react" doesn't match "react-native".
+    if (technology && technology.trim()) {
+      filter.technology = new RegExp(`^${escapeRegex(technology.trim())}$`, 'i');
+    }
+    if (language && language.trim()) {
+      filter.language = new RegExp(`^${escapeRegex(language.trim())}$`, 'i');
+    }
+    if (project && project.trim()) {
+      filter.project = new RegExp(`^${escapeRegex(project.trim())}$`, 'i');
+    }
+
+    // Tag match: at least one element in the tags array must equal the supplied
+    // tag value (case-insensitive, anchored).
+    if (tag && tag.trim()) {
+      filter.tags = {
+        $elemMatch: { $regex: new RegExp(`^${escapeRegex(tag.trim())}$`, 'i') },
+      };
+    }
+
+    // ── Execute query ─────────────────────────────────────────────────────────
+    const solutions = await Solution.find(filter).sort({ createdAt: -1 });
+
     return res.status(200).json({ success: true, data: solutions });
   } catch (err) {
     next(err);

@@ -19,3 +19,21 @@ export const updateSolution = (id, payload) =>
 /** DELETE /api/solutions/:id */
 export const deleteSolution = (id) =>
   del(`/solutions/${id}`);
+
+/**
+ * GET /api/solutions/search
+ *
+ * Sends a keyword/filter search to the backend.
+ * Only params with non-empty values are appended to the query string.
+ *
+ * @param {{ q?: string, technology?: string, language?: string, project?: string, tag?: string }} params
+ */
+export const searchSolutions = (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.q          && params.q.trim())          qs.set('q',          params.q.trim());
+  if (params.technology && params.technology.trim()) qs.set('technology',  params.technology.trim());
+  if (params.language   && params.language.trim())   qs.set('language',    params.language.trim());
+  if (params.project    && params.project.trim())    qs.set('project',     params.project.trim());
+  if (params.tag        && params.tag.trim())        qs.set('tag',         params.tag.trim());
+  return get(`/solutions/search?${qs.toString()}`);
+};
