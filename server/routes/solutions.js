@@ -6,8 +6,6 @@ import {
   createSolution,
   updateSolution,
   deleteSolution,
-  keywordSearch,
-  semanticSearch,
   searchController,
 } from '../controllers/solutionsController.js';
 

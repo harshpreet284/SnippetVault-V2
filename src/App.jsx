@@ -1,6 +1,4 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { useEffect } from 'react';
 import Home from './components/Home';
 import Paste from './components/Paste';
 import ViewPaste from './components/ViewPaste';
