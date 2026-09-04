@@ -8,7 +8,7 @@
  * - Never touches, stores, or decodes the JWT — that lives in the cookie only.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const BASE_URL = import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
 
 /**
  * @param {string} path      - API path, e.g. '/auth/login'
