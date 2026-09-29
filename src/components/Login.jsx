@@ -20,8 +20,26 @@ const Login = () => {
   };
 
   return (
-    <div className="w-full h-full py-10 max-w-[480px] mx-auto px-5 lg:px-0">
-      <div className="flex flex-col gap-y-5 items-start">
+    <div className="w-full h-full py-10 max-w-[900px] mx-auto px-5 lg:px-0 flex flex-col md:flex-row gap-12 items-center justify-center">
+      
+      {/* Hero Section */}
+      <div className="flex flex-col gap-y-4 md:w-1/2">
+        <h1 className="text-4xl font-bold tracking-tight text-gray-900 leading-tight">
+          Your Personal Engineering Memory
+        </h1>
+        <p className="text-lg text-gray-600">
+          Keep track of the technical problems you&apos;ve solved, the solutions that worked, and the context behind them.
+        </p>
+        <p className="text-base text-gray-500">
+          Search your knowledge using keywords or describe what you&apos;re looking for with semantic search.
+        </p>
+        <div className="text-sm font-bold text-gray-400 mt-2 tracking-widest uppercase">
+          Organize. Remember. Retrieve.
+        </div>
+      </div>
+
+      {/* Login Form Container */}
+      <div className="flex flex-col gap-y-5 items-start w-full md:w-1/2 max-w-[480px]">
         {/* macOS-style panel */}
         <div className="w-full flex flex-col items-start relative rounded bg-opacity-10 border border-[rgba(128,121,121,0.3)] backdrop-blur-2xl">
           {/* Title bar */}
